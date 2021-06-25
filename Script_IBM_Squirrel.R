@@ -221,8 +221,31 @@ KinshipStructure <- function(popSim, nstages){ # entry = popSim which contains t
   allwithparents <- dataall[!is.na(dataall$motherID),] #se data for individuals with known parents only
   # For individuals alive at last time step
     datalast <- as.matrix(popSim[[length(popSim)]])
+    # Stages - calculated among all females with known mother ever alive
+    stages<- 1:nstages
     if(nrow(datalast)==0){
-      kinshipinfo <- NA
+      Res_summary <- data.frame(ego.age=stages,
+                                nb.ego=c(rep(0,length(stages))),  # number of ego aged i at last time step
+                                nb.ego.MA=c(rep(0,length(stages))),  # number of ego aged i with mother alive at last time step
+                                Pr_MA =c(rep(0,length(stages))), # proba mother alive for ego age i
+                                nb.ego.GMA=c(rep(0,length(stages))),  # number of ego aged i with mother alive at last time step
+                                Pr_GMA =c(rep(0,length(stages))),
+                                Avg_Sis = c(rep(0,length(stages))),
+                                Avg_Aunts = c(rep(0,length(stages))),
+                                Avg_Ch = c(rep(0,length(stages))),
+                                Avg_GCh = c(rep(0,length(stages))),
+                                Avg_Cou = c(rep(0,length(stages))),
+                                Avg_Nie = c(rep(0,length(stages)))
+      )
+      kinshipinfo <- list(res=Res_summary,
+                          K_Mothers=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_GrandMothers=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_Sisters=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_Aunts=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_Children=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_GrandChildren=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_Cousins=matrix(0, nrow=max(stages),ncol=max(stages)),
+                          K_Nieces=matrix(0, nrow=max(stages),ncol=max(stages)) )
     }else{
   if(is.null(popSim$Sex)==TRUE){
     AllFem <- allwithparents
@@ -233,8 +256,8 @@ KinshipStructure <- function(popSim, nstages){ # entry = popSim which contains t
     AllFem <- allwithparents[allwithparents$sex=="F",] 
     datalastF <- datalast[ (datalast$sex=="F" & !is.na(datalast$motherID) ) ,] # keep only females with known mother 
   }
-  # Ages - calculated among all females with known mother ever alive
-  stages<- 1:nstages
+  # Stages - calculated among all females with known mother ever alive
+  #stages<- 1:nstages
   # ID of all mothers and grandmothers ever lived in pop
   IDMothers <- unique(AllFem[,'motherID'] ) # mothers of at least one female
   IDGrandMothers <- unique( AllFem[which(AllFem$who %in% IDMothers),'motherID'] )# grand mother of at least one female
@@ -419,7 +442,6 @@ KinshipStructure <- function(popSim, nstages){ # entry = popSim which contains t
 }
 
 
-
 # 5- Run the IBM simulations
 
 # Define the model parameters
@@ -428,8 +450,8 @@ nYearSim <- 50 # how many years of simulation
 
 # Create the initial population at the beginning of each simulation replicate
 # Create a data frame of the individual wolf characteristics in the initial population
-initPop_DF <- data.frame(ID = 1:100, # 100 individuals with id from 1 to 100
-                             stage = c(rep(c(3, 2, 1, 3, 2), 20))
+initPop_DF <- data.frame(ID = 1:1010, # 100 individuals with id from 1 to 100
+                             stage = c(rep(1,470),rep(2,270),rep(3,270) )
 )
 
 # Create the initial population using the NetLogoR package
@@ -526,10 +548,29 @@ for(j in 1:nReplicate){ # loop over the simulation replicates
 ###########################
 
 # SAVE RESULTS
-save(kinship, file = "kinship_squirrel_T50.RData")
-save(popSim,file="popSim_squirrel_T50.Rdata")
-save(lambda,file="lambda_squirrel_T50.Rdata")
-save(w,file="StableAge_squirrel_T50.Rdata")
+#save(lambda,file="lambda_squirrel_T50_300R.Rdata") # growth rate
+#save(w,file="StableAge_squirrel_T50_300R.Rdata") # stable stage structure
+#save(kinship, file = "kinship_squirrel_T50_300R.RData") # kinhsip structure calculated at the last iteration for each replicate
+#save(popSimRep,file="popSim_squirrel_T50_300R.Rdata") # list of agentmatrix objects, require package NetLogoR
+
+# save popSim without need to load NetLogoR
+#  popSimRep_matrixformat <- matpop <- list()
+#for(i in 1:nReplicate){
+#  for(j in 1:(nYearSim+1)){
+#  matpop[[j]] <- as.matrix.default(popSimRep[[300]][[51]])
+#  }
+#  popSimRep_matrixformat[[i]] <- matpop
+#  }
+#  save(popSimRep_matrixformat,file="popSimRep_matrixformat_squirrel_T50_300R.Rdata")
+ 
+# LOAD RESULTS
+load(file="lambda_squirrel_T50_300R.Rdata") # lambda, list which contains growth rate
+load(file="StableAge_squirrel_T50_300R.Rdata") # w, list which stable stage structure calculated at the last iteration for each replicate
+load(file = "kinship_squirrel_T50_300R.RData") # kinship, list which kinhsip structure calculated at the last iteration for each replicate
+load(file="popSim_squirrel_T50_300R.Rdata") # popSimRep, a list of agentmatrix objects which contains the simulated population, require package NetLogoR
+
+# save popSim without need to load NetLogoR
+load(file="popSimRep_matrixformat_squirrel_T50_300R.Rdata") # simulation results can be loaded without package NetLogoR
 
 # Check pop sizes - select only replicates with enough sample to calculate kinship (>100 indiv at the last time step)
 poplast <- lapply(popSimRep, tail, n = 1L)
@@ -543,7 +584,7 @@ more100ind <- which(nlastmat>50)[1:200]
 # check stable age structure
 w1 <-list.rbind(w)[,1]# quantile(,probs=c(0.025,0.5,0.975),na.rm=T)
 w2 <-list.rbind(w)[,2]#quantile(,probs=c(0.025,0.5,0.975),na.rm=T)
-w3 <-list.rbind(w)[,3]#quantile(,probs=c(0.025,0.5,0.975),na.rm=T)
+w3 <-list.rbind(w)[,3]#quantile(,probs=c(0.025,0.5,0.975),na.rm)à÷i=T)
 summary(w1)
 summary(w2)
 summary(w3)
@@ -564,12 +605,6 @@ plot(density(lamda_lastT,na.rm=T),
      xlab="Growth rate",
      las=T)
 abline(v=lambda_equi,lwd=2,col="red")
-
-
-# Select kinship for 200 replicates for which population did not go extinct
-notextinct <- which(sapply(w,sum)!=0)[1:200]
-nReplicate <- length(notextinct)
-kinship<- kinship[notextinct]
 
 # Get mean/median with 95%CI simulated kinship matrices 
 nkins <- 8 # mother, grandmother, sister, aunts, children, grandchildren, 
@@ -595,9 +630,9 @@ simulatedK # list of mean kinship matrix for each kin in this order
 #quantK # list of 2.5% , median and 97% quantile for each kin in this order
 # mother, gmother, sisters, aunts, female children, female gchildren, female cousins, nieces
 
-# Compare simulated versus expected kinship matrices
-mean(round(simulatedK$mother - expectedK$mother ,2))
-mean(round(simulatedK$aunts - expectedK$aunts,2))
+# BIAS: Compare simulated versus expected kinship matrices
+round(simulatedK$mother - expectedK$mother ,2)
+round(simulatedK$aunts - expectedK$aunts,2)
 
 # Plot simulated versus expected kinship structure for each stage of ego (averaged over kin age)
   Mother_simulated_expected <- data.frame(stage=c("a1","a2","a3"),
@@ -611,7 +646,7 @@ mean(round(simulatedK$aunts - expectedK$aunts,2))
     geom_point(aes(x=stage, y=predicted), size=2, shape=17,col="red", position = position_nudge(x = +0.05)) 
   p +  ylim(0,1) +
     ylab("Probability of mother being alive")
-  ggsave("Mother.pdf")
+  ggsave("Mother_300rep.pdf")
 
   Aunts_simulated_expected <- data.frame(stage=c("a1","a2","a3"),
                                        meanvalue=apply(simulatedK$aunts,2,sum),
@@ -626,4 +661,4 @@ mean(round(simulatedK$aunts - expectedK$aunts,2))
   p2 +  ylim(0,1.5) +
     ylab("Number of aunts alive")
 
-    ggsave("Aunts.pdf")
+    ggsave("Aunts_300rep.pdf")
